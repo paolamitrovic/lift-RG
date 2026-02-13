@@ -4,7 +4,8 @@
 #include <glm/gtc/matrix_transform.hpp>
 
 struct Elevator {
-    unsigned int VAO, VBO;
+    unsigned int VAO[6];  // 6 strana: pod, plafon, 4 zida
+    unsigned int VBO[6];
     unsigned int texture;
     glm::mat4 modelMatrix;
     float x, y, z;

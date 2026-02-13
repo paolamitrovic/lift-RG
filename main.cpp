@@ -16,6 +16,7 @@
 #include "Util.h"
 #include "Floor.h"
 #include "Wall.h"
+#include "Elevator.h"
 #include "model.hpp"
 
 bool useTex = true; // Uključimo teksture po defaultu
@@ -196,6 +197,7 @@ int main(void)
     // Učitaj teksture
     unsigned int floorTexture = preprocessTexture("textures floor/diagonal_parquet_diff_2k.jpg");
     unsigned int wallTexture = preprocessTexture("textures wall/rock_face_03_rough_2k.jpg");
+    unsigned int elevatorTexture = preprocessTexture("textures elevator/blue_metal_plate_rough_2k.jpg");
     
     // Dimenzije sprata - uža prostorija kao hodnik
     float floorWidth = 3.0f;   // Uža širina (kao hodnik)
@@ -229,6 +231,16 @@ int main(void)
     ceiling.setup(floorWidth, floorDepth, wallHeight);
     ceiling.texture = wallTexture;
     
+    // Kreiraj lift - kvadar na kraju hodnika (suprotno od biljke)
+    // Lift je uzak ali realan - dubina 1.5m, popunjava od zida do zida, od poda do plafona
+    // Lift je malo unutar zidova da se izbegne z-fighting
+    float elevatorDepth = 1.5f;  // Dubina lifta
+    float elevatorZ = floorDepth/2.0f - elevatorDepth/2.0f;  // Pozicija lifta na kraju hodnika
+    float elevatorWidth = floorWidth - 0.02f;  // Malo uža širina da se izbegne z-fighting sa zidovima
+    
+    Elevator elevator;
+    elevator.setup(elevatorWidth, elevatorDepth, wallHeight, 0.0f, 0.0f, elevatorZ);
+    elevator.texture = elevatorTexture;
     
     // Učitaj biljku - u jednom uglu sprata
     Model plant("plant 1/uploads_files_4769167_Flower.obj");
@@ -326,13 +338,16 @@ int main(void)
         glUniform1i(glGetUniformLocation(unifiedShader, "transparent"), transparent);
         floor.draw(unifiedShader);
         
-        // Renderuj zidove (sa teksturom) - samo 4 zida
+        // Renderuj zidove (sa teksturom) - sve 4 zida
         for (int i = 0; i < 4; i++) {
             walls[i].draw(unifiedShader);
         }
         
-        // Renderuj plafon
+        // Renderuj plafon sprata
         ceiling.draw(unifiedShader);
+        
+        // Renderuj lift POSLE plafona i zidova, ali sa negativnim depth offset-om da bude iznad
+        elevator.draw(unifiedShader);
         
         // Renderuj biljku sa model shader-om (koristi normalu)
         glUseProgram(modelShader);
