@@ -9,6 +9,6 @@ struct Floor {
     glm::mat4 modelMatrix;
     
     Floor();
-    void setup(float width, float depth, float y);
+    void setup(float width, float depth, float y, bool isCeiling = false);
     void draw(unsigned int shader);
 };

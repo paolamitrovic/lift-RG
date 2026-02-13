@@ -48,9 +48,9 @@ void Wall::setup(float width, float height, float x, float y, float z, float rot
     glBindVertexArray(0);
     
     // Postavi model matricu sa rotacijom i translacijom
-    // Translacija po Y osi je 0 jer zid počinje na Y=0 da se spoji sa podom
+    // Translacija po Y osi koristi y parametar da se zid postavi na pravilnu visinu sprata
     modelMatrix = glm::mat4(1.0f);
-    modelMatrix = glm::translate(modelMatrix, glm::vec3(x, 0.0f, z)); // Y=0 da se spoji sa podom
+    modelMatrix = glm::translate(modelMatrix, glm::vec3(x, y, z)); // Y=y da se zid postavi na pravilnu visinu sprata
     modelMatrix = glm::rotate(modelMatrix, glm::radians(rotationY), glm::vec3(0.0f, 1.0f, 0.0f));
 }
 

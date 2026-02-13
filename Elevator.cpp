@@ -178,7 +178,7 @@ void Elevator::setup(float w, float d, float h, float posX, float posY, float po
     
     // Postavi model matricu
     modelMatrix = glm::mat4(1.0f);
-    modelMatrix = glm::translate(modelMatrix, glm::vec3(x, 0.0f, z)); // Pod lifta na Y=0
+    modelMatrix = glm::translate(modelMatrix, glm::vec3(x, posY, z)); // Pod lifta na Y=posY (visina sprata)
 }
 
 void Elevator::draw(unsigned int shader, float doorOpenAmount) {

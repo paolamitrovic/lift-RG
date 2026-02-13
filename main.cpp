@@ -202,67 +202,116 @@ int main(void)
     // Dimenzije sprata - uža prostorija kao hodnik
     float floorWidth = 3.0f;   // Uža širina (kao hodnik)
     float floorDepth = 10.0f;  // Dužina hodnika
-    float wallHeight = 3.0f;
+    float wallHeight = 3.0f;   // Visina jednog sprata
+    const int FLOOR_COUNT = 8; // Ukupno 8 spratova (0-7)
     
-    // Kreiraj sprat (pod)
-    Floor floor;
-    floor.setup(floorWidth, floorDepth, 0.0f); // širina, dubina, visina Y
-    floor.texture = floorTexture;
+    // Visine svakog sprata (Y pozicija poda)
+    // Sprat 0: -3.0f, Sprat 1: 0.0f, Sprat 2: 3.0f, ..., Sprat 7: 18.0f
+    float floorHeights[FLOOR_COUNT];
+    for (int i = 0; i < FLOOR_COUNT; i++) {
+        floorHeights[i] = (i - 1) * wallHeight; // Sprat 1 je na Y=0
+    }
     
-    // Kreiraj zidove (4 zida okrenuta ka unutra)
-    // Zidovi se postavljaju tako da se donja ivica (Y=0) spoji sa podom
-    // y parametar u setup() se ne koristi za Y translaciju (zid uvek počinje na Y=0)
-    Wall walls[4];
-    // Prednji zid (gleda ka -Z) - na poziciji z = -floorDepth/2
-    walls[0].setup(floorWidth, wallHeight, 0.0f, 0.0f, -floorDepth/2.0f, 0.0f);
-    walls[0].texture = wallTexture;
-    // Zadnji zid (gleda ka +Z) - na poziciji z = floorDepth/2
-    walls[1].setup(floorWidth, wallHeight, 0.0f, 0.0f, floorDepth/2.0f, 180.0f);
-    walls[1].texture = wallTexture;
-    // Levi zid (gleda ka +X) - na poziciji x = -floorWidth/2
-    walls[2].setup(floorDepth, wallHeight, -floorWidth/2.0f, 0.0f, 0.0f, 90.0f);
-    walls[2].texture = wallTexture;
-    // Desni zid (gleda ka -X) - na poziciji x = floorWidth/2
-    walls[3].setup(floorDepth, wallHeight, floorWidth/2.0f, 0.0f, 0.0f, -90.0f);
-    walls[3].texture = wallTexture;
+    // Razmak između plafona jednog sprata i poda sledećeg sprata (da se izbegne z-fighting)
+    float floorGap = 0.01f;
     
-    // Kreiraj plafon (gornji zid)
-    Floor ceiling;
-    ceiling.setup(floorWidth, floorDepth, wallHeight);
-    ceiling.texture = wallTexture;
+    // Kreiraj spratove (podovi)
+    Floor floors[FLOOR_COUNT];
+    for (int i = 0; i < FLOOR_COUNT; i++) {
+        // Pod je malo iznad donje granice sprata (osim za najniži sprat)
+        float floorY = floorHeights[i];
+        if (i > 0) {
+            floorY += floorGap; // Dodaj mali razmak iznad plafona prethodnog sprata
+        }
+        floors[i].setup(floorWidth, floorDepth, floorY);
+        floors[i].texture = floorTexture;
+    }
     
-    // Kreiraj lift - kvadar na kraju hodnika (suprotno od biljke)
-    // Lift je uzak ali realan - dubina 1.5m, popunjava od zida do zida, od poda do plafona
-    // Lift je malo unutar zidova da se izbegne z-fighting
+    // Kreiraj plafone (gornji zidovi) - sa obrnutom normalom
+    Floor ceilings[FLOOR_COUNT];
+    for (int i = 0; i < FLOOR_COUNT; i++) {
+        // Plafon je malo ispod gornje granice sprata
+        float ceilingY = floorHeights[i] + wallHeight - floorGap;
+        ceilings[i].setup(floorWidth, floorDepth, ceilingY, true); // true = plafon
+        ceilings[i].texture = wallTexture;
+    }
+    
+    // Kreiraj zidove (4 zida po spratu)
+    Wall walls[FLOOR_COUNT][4];
+    for (int floor = 0; floor < FLOOR_COUNT; floor++) {
+        // Zidovi počinju na visini poda (sa razmakom ako postoji)
+        float floorY = floorHeights[floor];
+        if (floor > 0) {
+            floorY += floorGap; // Dodaj razmak za pod
+        }
+        // Prednji zid (gleda ka -Z)
+        walls[floor][0].setup(floorWidth, wallHeight, 0.0f, floorY, -floorDepth/2.0f, 0.0f);
+        walls[floor][0].texture = wallTexture;
+        // Zadnji zid (gleda ka +Z)
+        walls[floor][1].setup(floorWidth, wallHeight, 0.0f, floorY, floorDepth/2.0f, 180.0f);
+        walls[floor][1].texture = wallTexture;
+        // Levi zid (gleda ka +X)
+        walls[floor][2].setup(floorDepth, wallHeight, -floorWidth/2.0f, floorY, 0.0f, 90.0f);
+        walls[floor][2].texture = wallTexture;
+        // Desni zid (gleda ka -X)
+        walls[floor][3].setup(floorDepth, wallHeight, floorWidth/2.0f, floorY, 0.0f, -90.0f);
+        walls[floor][3].texture = wallTexture;
+    }
+    
+    // Kreiraj liftove - jedan lift na svakom spratu
     float elevatorDepth = 1.5f;  // Dubina lifta
     float elevatorZ = floorDepth/2.0f - elevatorDepth/2.0f;  // Pozicija lifta na kraju hodnika
     float elevatorWidth = floorWidth - 0.02f;  // Malo uža širina da se izbegne z-fighting sa zidovima
     
-    Elevator elevator;
-    elevator.setup(elevatorWidth, elevatorDepth, wallHeight, 0.0f, 0.0f, elevatorZ);
-    elevator.texture = elevatorTexture;
+    Elevator elevators[FLOOR_COUNT];
+    for (int i = 0; i < FLOOR_COUNT; i++) {
+        // Lift počinje na visini poda (sa razmakom ako postoji)
+        float elevatorY = floorHeights[i];
+        if (i > 0) {
+            elevatorY += floorGap; // Dodaj razmak za pod
+        }
+        elevators[i].setup(elevatorWidth, elevatorDepth, wallHeight, 0.0f, elevatorY, elevatorZ);
+        elevators[i].texture = elevatorTexture;
+    }
     
-    // Učitaj biljku - uz prednji zid (najdalji od lifta, u koji prvo pogleda čovek), na sredini po X osi
+    // Učitaj biljke - jedna biljka na svakom spratu
     Model plant("plant 1/uploads_files_4769167_Flower.obj");
-    glm::mat4 plantModel = glm::mat4(1.0f);
-    // Pozicija biljke: sredina po X osi (0.0), uz prednji zid (-floorDepth/2.0f + malo unutar)
-    plantModel = glm::translate(plantModel, glm::vec3(0.0f, 0.0f, -floorDepth/2.0f + 0.3f));
-    plantModel = glm::scale(plantModel, glm::vec3(3.0f, 3.0f, 3.0f)); // Povećano skaliranje da se vidi
+    glm::mat4 plantModels[FLOOR_COUNT];
+    for (int i = 0; i < FLOOR_COUNT; i++) {
+        plantModels[i] = glm::mat4(1.0f);
+        // Biljka je na visini poda (sa razmakom ako postoji)
+        float plantY = floorHeights[i];
+        if (i > 0) {
+            plantY += floorGap;
+        }
+        plantModels[i] = glm::translate(plantModels[i], glm::vec3(0.0f, plantY, -floorDepth/2.0f + 0.3f));
+        plantModels[i] = glm::scale(plantModels[i], glm::vec3(3.0f, 3.0f, 3.0f));
+    }
     
-    // Učitaj lampu za lift - na sredini plafona lifta, malo ispod
+    // Učitaj lampe za liftove - jedna lampa na svakom spratu u liftu
     Model elevatorLamp("elevator lamp/AM152_063_Lugstar_Premium_LED.obj");
-    glm::mat4 lampModel = glm::mat4(1.0f);
-    // Pozicija lampe: sredina lifta po X i Z osi, malo ispod plafona lifta
-    float lampY = wallHeight - 0.15f; // Malo ispod plafona lifta (plafon je na wallHeight - 0.01)
-    lampModel = glm::translate(lampModel, glm::vec3(0.0f, lampY, elevatorZ)); // Sredina lifta
-    lampModel = glm::scale(lampModel, glm::vec3(0.03f, 0.03f, 0.03f)); // Smanjeno skaliranje
+    glm::mat4 lampModels[FLOOR_COUNT];
+    float lampOffset = -0.3f; // Udaljenija od plafona, ali dovoljno visoko da ne viri kroz pod
+    for (int i = 0; i < FLOOR_COUNT; i++) {
+        lampModels[i] = glm::mat4(1.0f);
+        // Lampa je tik uz plafon (plafon je na floorHeights[i] + wallHeight - floorGap)
+        float ceilingY = floorHeights[i] + wallHeight - floorGap;
+        float lampFloorY = ceilingY + lampOffset;
+        lampModels[i] = glm::translate(lampModels[i], glm::vec3(0.0f, lampFloorY, elevatorZ));
+        lampModels[i] = glm::scale(lampModels[i], glm::vec3(0.03f, 0.03f, 0.03f));
+    }
     
-    // Učitaj lampu za plafon sprata - na sredini plafona sprata, malo ispod
+    // Učitaj lampe za plafone - jedna lampa na svakom spratu na plafonu
     Model floorLamp("elevator lamp/AM152_063_Lugstar_Premium_LED.obj");
-    glm::mat4 floorLampModel = glm::mat4(1.0f);
-    // Pozicija lampe: sredina sprata po X i Z osi, malo ispod plafona sprata
-    floorLampModel = glm::translate(floorLampModel, glm::vec3(0.0f, lampY, 0.0f)); // Sredina sprata
-    floorLampModel = glm::scale(floorLampModel, glm::vec3(0.03f, 0.03f, 0.03f)); // Isto skaliranje kao lampa u liftu
+    glm::mat4 floorLampModels[FLOOR_COUNT];
+    for (int i = 0; i < FLOOR_COUNT; i++) {
+        floorLampModels[i] = glm::mat4(1.0f);
+        // Lampa je tik uz plafon (plafon je na floorHeights[i] + wallHeight - floorGap)
+        float ceilingY = floorHeights[i] + wallHeight - floorGap;
+        float lampFloorY = ceilingY + lampOffset;
+        floorLampModels[i] = glm::translate(floorLampModels[i], glm::vec3(0.0f, lampFloorY, 0.0f));
+        floorLampModels[i] = glm::scale(floorLampModels[i], glm::vec3(0.03f, 0.03f, 0.03f));
+    }
     
     // VRATA - animacija (iz 2D projekta)
     float doorOpenAmount = 0.0f;         // Koliko su vrata otvorena (0=zatvoreno, 1=potpuno)
@@ -275,18 +324,23 @@ int main(void)
     // OSOBA - da li je u liftu
     bool personHasEnteredElevator = false;   // Da li je čovek ušao u lift
     
+    // SPRATOVI - trenutni sprat čoveka
+    int currentFloor = 1;  // Trenutni sprat (1 = srednji sprat, 0-7)
+    bool floorUpWasPressed = false;    // Da li je strelica gore bila pritisnuta u prethodnom frame-u
+    bool floorDownWasPressed = false;  // Da li je strelica dole bila pritisnuta u prethodnom frame-u
+    
     // Podešavanja za testiranje dubine i odstranjivanje naličja (toggle stanja)
     bool depthTestWasPressed = false;   // Da li je taster 1 bio pritisnut u prethodnom frame-u
     bool depthTestDisableWasPressed = false; // Da li je taster 2 bio pritisnut u prethodnom frame-u
     bool cullFaceWasPressed = false;    // Da li je taster 3 bio pritisnut u prethodnom frame-u
     bool cullFaceDisableWasPressed = false; // Da li je taster 4 bio pritisnut u prethodnom frame-u
     
-    // Granice kretanja kamere (čoveka)
+    // Granice kretanja kamere (čoveka) - ažuriraju se u zavisnosti od trenutnog sprata
     float minX = -floorWidth/2.0f + 0.2f;  // Leva granica (malo unutar zida)
     float maxX = floorWidth/2.0f - 0.2f;   // Desna granica (malo unutar zida)
     float minZ = -floorDepth/2.0f + 0.2f;  // Prednja granica
     float maxZ = floorDepth/2.0f - 0.2f;   // Zadnja granica
-    float cameraY = 1.5f;  // Visina kamere (čoveka)
+    float cameraY = 1.5f;  // Visina kamere (čoveka) - relativno u odnosu na sprat
     
 
     // ++++++++++++++++++++++++++++++++++++++++++++++++++++++            UNIFORME            +++++++++++++++++++++++++++++++++++++++++++++++++
@@ -319,10 +373,6 @@ int main(void)
     unsigned int materialDLoc = glGetUniformLocation(unifiedShader, "uMaterial.kD");
     unsigned int materialSLoc = glGetUniformLocation(unifiedShader, "uMaterial.kS");
     
-    // Pozicije lampi (izvori svetlosti)
-    glm::vec3 elevatorLightPos = glm::vec3(0.0f, lampY, elevatorZ); // Pozicija lampe u liftu
-    glm::vec3 floorLightPos = glm::vec3(0.0f, lampY, 0.0f); // Pozicija lampe na spratu
-    
     glm::mat4 view;
     glm::vec3 cameraUp = glm::vec3(0.0, 1.0, 0.0);
     glm::mat4 projectionP = glm::perspective(glm::radians(fov), (float)wWidth / (float)wHeight, 0.1f, 100.0f);
@@ -333,19 +383,19 @@ int main(void)
     glUniform3f(lightALoc, 0.3f, 0.3f, 0.3f); // Ambijentalna komponenta
     glUniform3f(lightDLoc, 2.0f, 2.0f, 2.0f); // Difuzna komponenta (jača da se vidi krug)
     glUniform3f(lightSLoc, 1.0f, 1.0f, 1.0f); // Spekularna komponenta
-    // Attenuation za prvi izvor (slabljenje sa udaljenošću) - stvara krug svetlosti
+    // Attenuation za prvi izvor (slabljenje sa udaljenošću) - smanjeno da svetlost ne slabi toliko
     glUniform1f(lightConstantLoc, 1.0f);
-    glUniform1f(lightLinearLoc, 0.14f);
-    glUniform1f(lightQuadraticLoc, 0.07f);
+    glUniform1f(lightLinearLoc, 0.09f);  // Smanjeno sa 0.14
+    glUniform1f(lightQuadraticLoc, 0.032f); // Smanjeno sa 0.07
     
     // Drugi izvor svetlosti (lampa u liftu) - jača svetlost u liftu
     glUniform3f(light2ALoc, 0.3f, 0.3f, 0.3f); // Ambijentalna komponenta
     glUniform3f(light2DLoc, 2.5f, 2.5f, 2.5f); // Difuzna komponenta (jača u liftu)
     glUniform3f(light2SLoc, 1.0f, 1.0f, 1.0f); // Spekularna komponenta
-    // Attenuation za drugi izvor (slabljenje sa udaljenošću) - stvara krug svetlosti u liftu
+    // Attenuation za drugi izvor (slabljenje sa udaljenošću) - smanjeno da svetlost ne slabi toliko
     glUniform1f(light2ConstantLoc, 1.0f);
-    glUniform1f(light2LinearLoc, 0.14f);
-    glUniform1f(light2QuadraticLoc, 0.07f);
+    glUniform1f(light2LinearLoc, 0.09f);  // Smanjeno sa 0.14
+    glUniform1f(light2QuadraticLoc, 0.032f); // Smanjeno sa 0.07
     
     // Materijal za pod, zidove i lift (neutralan materijal)
     glUniform1f(materialShineLoc, 32.0f); // Uglancanost
@@ -355,8 +405,12 @@ int main(void)
 
     glClearColor(0.2, 0.2, 0.3, 1.0); // Tamnija pozadina
     
-    // Početna pozicija kamere (čoveka) - na spratu, malo levo od centra
-    cameraPos = glm::vec3(-2.0f, cameraY, 0.0f);
+    // Početna pozicija kamere (čoveka) - na trenutnom spratu, malo levo od centra
+    float startFloorY = floorHeights[currentFloor];
+    if (currentFloor > 0) {
+        startFloorY += floorGap;
+    }
+    cameraPos = glm::vec3(-2.0f, startFloorY + cameraY, 0.0f);
 
     while (!glfwWindowShouldClose(window))
     {
@@ -398,6 +452,37 @@ int main(void)
         }
         cullFaceDisableWasPressed = cullFaceDisablePressed;
 
+        // SKAKANJE SA SPRATA NA SPRAT (strelica gore/dole) - teleport za visinu sprata
+        bool floorUpPressed = (glfwGetKey(window, GLFW_KEY_UP) == GLFW_PRESS);
+        if (floorUpPressed && !floorUpWasPressed) {
+            // Skok na sprat iznad (ako postoji)
+            if (currentFloor < FLOOR_COUNT - 1) {
+                currentFloor++;
+                // Teleport kamere za visinu sprata (sa razmakom)
+                float newFloorY = floorHeights[currentFloor];
+                if (currentFloor > 0) {
+                    newFloorY += floorGap;
+                }
+                cameraPos.y = newFloorY + cameraY;
+            }
+        }
+        floorUpWasPressed = floorUpPressed;
+        
+        bool floorDownPressed = (glfwGetKey(window, GLFW_KEY_DOWN) == GLFW_PRESS);
+        if (floorDownPressed && !floorDownWasPressed) {
+            // Skok na sprat ispod (ako postoji)
+            if (currentFloor > 0) {
+                currentFloor--;
+                // Teleport kamere za visinu sprata (sa razmakom)
+                float newFloorY = floorHeights[currentFloor];
+                if (currentFloor > 0) {
+                    newFloorY += floorGap;
+                }
+                cameraPos.y = newFloorY + cameraY;
+            }
+        }
+        floorDownWasPressed = floorDownPressed;
+
         // WASD kretanje kamere (čoveka) sa ograničenjima
         glm::vec3 newCameraPos = cameraPos;
         
@@ -419,12 +504,12 @@ int main(void)
         }
         
         // POZIV LIFTA (C) - iz 2D projekta
-        // Proveri da li je čovek blizu lifta (ispred lifta, blizu pozicije lifta po Z osi)
-        // Lift je na poziciji Z = elevator.z, širina = elevator.width, dubina = elevator.depth
-        float elevatorFrontZ = elevator.z - elevator.depth/2.0f;  // Prednja strana lifta (gleda ka -Z)
+        // Proveri da li je čovek blizu lifta na trenutnom spratu (ispred lifta, blizu pozicije lifta po Z osi)
+        // Lift je na poziciji Z = elevatorZ, širina = elevatorWidth, dubina = elevatorDepth
+        float elevatorFrontZ = elevatorZ - elevatorDepth/2.0f;  // Prednja strana lifta (gleda ka -Z)
         // Povećana granica za pozivanje lifta - omogućava pozivanje sa veće udaljenosti (do 1.5m ispred lifta)
         bool nearElevatorFront = (cameraPos.z >= elevatorFrontZ - 1.5f && cameraPos.z <= elevatorFrontZ + 0.3f);
-        bool nearElevatorX = (cameraPos.x >= -elevator.width/2.0f - 0.5f && cameraPos.x <= elevator.width/2.0f + 0.5f);
+        bool nearElevatorX = (cameraPos.x >= -elevatorWidth/2.0f - 0.5f && cameraPos.x <= elevatorWidth/2.0f + 0.5f);
         bool nearElevator = nearElevatorFront && nearElevatorX;
         
         // Čovek poziva lift kada je BLIZU lifta (ispred lifta) i pritisne C
@@ -468,11 +553,11 @@ int main(void)
         // Ako je čovek U LIFTU, ne može da izađe dok vrata nisu otvorena
         bool doorsFullyOpen = (doorOpenAmount >= 1.0f);
         
-        // Granice za lift
-        float elevatorMinX = -elevator.width/2.0f;
-        float elevatorMaxX = elevator.width/2.0f;
-        float elevatorMinZ = elevator.z - elevator.depth/2.0f;
-        float elevatorMaxZ = elevator.z + elevator.depth/2.0f;
+        // Granice za lift na trenutnom spratu
+        float elevatorMinX = -elevatorWidth/2.0f;
+        float elevatorMaxX = elevatorWidth/2.0f;
+        float elevatorMinZ = elevatorZ - elevatorDepth/2.0f;
+        float elevatorMaxZ = elevatorZ + elevatorDepth/2.0f;
         
         // Proveri da li je čovek u liftu (sa malim marginom)
         float margin = 0.05f; // Mala margina za detekciju
@@ -486,7 +571,7 @@ int main(void)
             // Ne dozvoli da uđe u lift dok vrata nisu otvorena
             // Blokiraj kretanje ako je blizu lifta (prednja strana)
             // Povećana granica za blokiranje da se izbegne treperenje
-            float elevatorFrontZ = elevator.z - elevator.depth/2.0f;  // Prednja strana lifta
+            float elevatorFrontZ = elevatorZ - elevatorDepth/2.0f;  // Prednja strana lifta
             float blockingDistance = 0.5f; // Povećana granica za blokiranje (0.5m ispred lifta)
             bool nearElevatorFront = (newCameraPos.z >= elevatorFrontZ - blockingDistance && newCameraPos.z <= elevatorFrontZ + 0.15f);
             bool nearElevatorX = (newCameraPos.x >= elevatorMinX - 0.15f && newCameraPos.x <= elevatorMaxX + 0.15f);
@@ -552,7 +637,12 @@ int main(void)
         // Ograniči kretanje unutar granica sprata (ali poštuj ograničenja za lift)
         newCameraPos.x = glm::clamp(newCameraPos.x, minX, maxX);
         newCameraPos.z = glm::clamp(newCameraPos.z, minZ, maxZ);
-        newCameraPos.y = cameraY; // Fiksna visina
+        // Visina kamere na trenutnom spratu (sa razmakom ako postoji)
+        float currentFloorY = floorHeights[currentFloor];
+        if (currentFloor > 0) {
+            currentFloorY += floorGap;
+        }
+        newCameraPos.y = currentFloorY + cameraY;
         cameraPos = newCameraPos;
         
         // ANIMACIJA VRATA - iz 2D projekta
@@ -592,49 +682,65 @@ int main(void)
         glUniformMatrix4fv(viewLoc, 1, GL_FALSE, glm::value_ptr(view));
         glUniformMatrix4fv(projectionLoc, 1, GL_FALSE, glm::value_ptr(projectionP));
         
-        // Postavi pozicije svetlosti (izvori svetlosti u lampama)
+        // Postavi pozicije svetlosti (izvori svetlosti u lampama) - koristi trenutni sprat
+        float currentCeilingY = floorHeights[currentFloor] + wallHeight - floorGap;
+        float currentLampY = currentCeilingY + lampOffset;
+        glm::vec3 currentFloorLightPos = glm::vec3(0.0f, currentLampY, 0.0f);
+        glm::vec3 currentElevatorLightPos = glm::vec3(0.0f, currentLampY, elevatorZ);
         glUniform3fv(viewPosLoc, 1, glm::value_ptr(cameraPos)); // Pozicija kamere
-        glUniform3fv(lightPosLoc, 1, glm::value_ptr(floorLightPos)); // Pozicija lampe na spratu
-        glUniform3fv(light2PosLoc, 1, glm::value_ptr(elevatorLightPos)); // Pozicija lampe u liftu
+        glUniform3fv(lightPosLoc, 1, glm::value_ptr(currentFloorLightPos)); // Pozicija lampe na trenutnom spratu
+        glUniform3fv(light2PosLoc, 1, glm::value_ptr(currentElevatorLightPos)); // Pozicija lampe u liftu na trenutnom spratu
         
-        // Renderuj pod (sa teksturom)
+        // Renderuj sve spratove
         glUniform1i(glGetUniformLocation(unifiedShader, "useTex"), useTex);
         glUniform1i(glGetUniformLocation(unifiedShader, "transparent"), transparent);
-        floor.draw(unifiedShader);
         
-        // Renderuj zidove (sa teksturom) - sve 4 zida
-        for (int i = 0; i < 4; i++) {
-            walls[i].draw(unifiedShader);
+        for (int floor = 0; floor < FLOOR_COUNT; floor++) {
+            // Renderuj pod
+            floors[floor].draw(unifiedShader);
+            
+            // Renderuj zidove (4 zida)
+            for (int i = 0; i < 4; i++) {
+                walls[floor][i].draw(unifiedShader);
+            }
+            
+            // Renderuj plafon
+            ceilings[floor].draw(unifiedShader);
+            
+            // Renderuj lift
+            elevators[floor].draw(unifiedShader, (floor == currentFloor) ? doorOpenAmount : 0.0f);
         }
         
-        // Renderuj plafon sprata
-        ceiling.draw(unifiedShader);
-        
-        // Renderuj lift POSLE plafona i zidova, ali sa negativnim depth offset-om da bude iznad
-        elevator.draw(unifiedShader, doorOpenAmount);
-        
-        // Renderuj lampu za lift sa model shader-om (koristi normalu)
+        // Renderuj modele (lampe i biljke) sa model shader-om
         glUseProgram(modelShader);
-        glUniformMatrix4fv(glGetUniformLocation(modelShader, "uM"), 1, GL_FALSE, glm::value_ptr(lampModel));
         glUniformMatrix4fv(glGetUniformLocation(modelShader, "uV"), 1, GL_FALSE, glm::value_ptr(view));
         glUniformMatrix4fv(glGetUniformLocation(modelShader, "uP"), 1, GL_FALSE, glm::value_ptr(projectionP));
         glUniform3f(glGetUniformLocation(modelShader, "uLightPos"), 0.0f, 2.0f, 0.0f);
         glUniform3fv(glGetUniformLocation(modelShader, "uViewPos"), 1, glm::value_ptr(cameraPos));
         glUniform3f(glGetUniformLocation(modelShader, "uLightColor"), 1.0f, 1.0f, 1.0f);
-        // Postavi boju za lampu (svetlo žuta/bele boje za lampu)
-        glUniform1i(glGetUniformLocation(modelShader, "uUseColor"), 1); // Koristi boju
-        glUniform3f(glGetUniformLocation(modelShader, "uModelColor"), 0.95f, 0.95f, 0.85f); // Svetlo žuta/bele boje
-        elevatorLamp.Draw(modelShader);
         
-        // Renderuj lampu za plafon sprata sa model shader-om (koristi normalu)
-        glUniformMatrix4fv(glGetUniformLocation(modelShader, "uM"), 1, GL_FALSE, glm::value_ptr(floorLampModel));
-        floorLamp.Draw(modelShader);
+        // Postavi boju za lampe
+        glUniform1i(glGetUniformLocation(modelShader, "uUseColor"), 1);
+        glUniform3f(glGetUniformLocation(modelShader, "uModelColor"), 0.95f, 0.95f, 0.85f);
+        
+        // Renderuj lampe za sve spratove
+        for (int floor = 0; floor < FLOOR_COUNT; floor++) {
+            // Lampa u liftu
+            glUniformMatrix4fv(glGetUniformLocation(modelShader, "uM"), 1, GL_FALSE, glm::value_ptr(lampModels[floor]));
+            elevatorLamp.Draw(modelShader);
+            
+            // Lampa na plafonu
+            glUniformMatrix4fv(glGetUniformLocation(modelShader, "uM"), 1, GL_FALSE, glm::value_ptr(floorLampModels[floor]));
+            floorLamp.Draw(modelShader);
+        }
         
         glUniform1i(glGetUniformLocation(modelShader, "uUseColor"), 0); // Vrati nazad za biljku
         
-        // Renderuj biljku sa model shader-om (koristi normalu)
-        glUniformMatrix4fv(glGetUniformLocation(modelShader, "uM"), 1, GL_FALSE, glm::value_ptr(plantModel));
-        plant.Draw(modelShader);
+        // Renderuj biljke na svim spratovima
+        for (int floor = 0; floor < FLOOR_COUNT; floor++) {
+            glUniformMatrix4fv(glGetUniformLocation(modelShader, "uM"), 1, GL_FALSE, glm::value_ptr(plantModels[floor]));
+            plant.Draw(modelShader);
+        }
         glUseProgram(unifiedShader); // Vrati nazad na unified shader
 
         // Render name texture overlay (always on top)
