@@ -10,6 +10,10 @@ Elevator::Elevator() {
         glGenVertexArrays(1, &VAO[i]);
         glGenBuffers(1, &VBO[i]);
     }
+    glGenVertexArrays(1, &VAOdoorLeft);
+    glGenBuffers(1, &VBOdoorLeft);
+    glGenVertexArrays(1, &VAOdoorRight);
+    glGenBuffers(1, &VBOdoorRight);
     texture = 0;
     modelMatrix = glm::mat4(1.0f);
     x = y = z = 0.0f;
@@ -66,17 +70,40 @@ void Elevator::setup(float w, float d, float h, float posX, float posY, float po
     glVertexAttribPointer(3, 3, GL_FLOAT, GL_FALSE, stride, (void*)(9 * sizeof(float)));
     glEnableVertexAttribArray(3);
     
-    // 3. PREDNJI ZID (Z=-d/2, normala ka +Z) - počinje od 0.01 da se spoji sa podom
-    float frontWallVertices[] = {
+    // 3. PREDNJI ZID - NE KORISTIMO GA, umesto toga koristimo dve polovine vrata
+    // (Prednji zid se ne renderuje, već se renderuju dve polovine vrata)
+    
+    // LEVA POLOVINA VRATA (od -w/2 do 0)
+    float doorLeftVertices[] = {
         -w/2, 0.01f, -d/2,  1.0f, 1.0f, 1.0f, 1.0f,  0.0f, 0.0f,  0.0f, 0.0f, 1.0f,
-         w/2, 0.01f, -d/2,  1.0f, 1.0f, 1.0f, 1.0f,  1.0f, 0.0f,  0.0f, 0.0f, 1.0f,
-         w/2, h, -d/2,  1.0f, 1.0f, 1.0f, 1.0f,  1.0f, 1.0f,  0.0f, 0.0f, 1.0f,
-        -w/2, h, -d/2,  1.0f, 1.0f, 1.0f, 1.0f,  0.0f, 1.0f,  0.0f, 0.0f, 1.0f,
+         0.0f, 0.01f, -d/2,  1.0f, 1.0f, 1.0f, 1.0f,  1.0f, 0.0f,  0.0f, 0.0f, 1.0f,
+         0.0f, h-0.01f, -d/2,  1.0f, 1.0f, 1.0f, 1.0f,  1.0f, 1.0f,  0.0f, 0.0f, 1.0f,
+        -w/2, h-0.01f, -d/2,  1.0f, 1.0f, 1.0f, 1.0f,  0.0f, 1.0f,  0.0f, 0.0f, 1.0f,
     };
     
-    glBindVertexArray(VAO[2]);
-    glBindBuffer(GL_ARRAY_BUFFER, VBO[2]);
-    glBufferData(GL_ARRAY_BUFFER, sizeof(frontWallVertices), frontWallVertices, GL_STATIC_DRAW);
+    glBindVertexArray(VAOdoorLeft);
+    glBindBuffer(GL_ARRAY_BUFFER, VBOdoorLeft);
+    glBufferData(GL_ARRAY_BUFFER, sizeof(doorLeftVertices), doorLeftVertices, GL_STATIC_DRAW);
+    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, stride, (void*)0);
+    glEnableVertexAttribArray(0);
+    glVertexAttribPointer(1, 4, GL_FLOAT, GL_FALSE, stride, (void*)(3 * sizeof(float)));
+    glEnableVertexAttribArray(1);
+    glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, stride, (void*)(7 * sizeof(float)));
+    glEnableVertexAttribArray(2);
+    glVertexAttribPointer(3, 3, GL_FLOAT, GL_FALSE, stride, (void*)(9 * sizeof(float)));
+    glEnableVertexAttribArray(3);
+    
+    // DESNA POLOVINA VRATA (od 0 do w/2)
+    float doorRightVertices[] = {
+         0.0f, 0.01f, -d/2,  1.0f, 1.0f, 1.0f, 1.0f,  0.0f, 0.0f,  0.0f, 0.0f, 1.0f,
+         w/2, 0.01f, -d/2,  1.0f, 1.0f, 1.0f, 1.0f,  1.0f, 0.0f,  0.0f, 0.0f, 1.0f,
+         w/2, h-0.01f, -d/2,  1.0f, 1.0f, 1.0f, 1.0f,  1.0f, 1.0f,  0.0f, 0.0f, 1.0f,
+         0.0f, h-0.01f, -d/2,  1.0f, 1.0f, 1.0f, 1.0f,  0.0f, 1.0f,  0.0f, 0.0f, 1.0f,
+    };
+    
+    glBindVertexArray(VAOdoorRight);
+    glBindBuffer(GL_ARRAY_BUFFER, VBOdoorRight);
+    glBufferData(GL_ARRAY_BUFFER, sizeof(doorRightVertices), doorRightVertices, GL_STATIC_DRAW);
     glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, stride, (void*)0);
     glEnableVertexAttribArray(0);
     glVertexAttribPointer(1, 4, GL_FLOAT, GL_FALSE, stride, (void*)(3 * sizeof(float)));
@@ -154,10 +181,9 @@ void Elevator::setup(float w, float d, float h, float posX, float posY, float po
     modelMatrix = glm::translate(modelMatrix, glm::vec3(x, 0.0f, z)); // Pod lifta na Y=0
 }
 
-void Elevator::draw(unsigned int shader) {
+void Elevator::draw(unsigned int shader, float doorOpenAmount) {
     glUseProgram(shader);
     unsigned int modelLoc = glGetUniformLocation(shader, "uM");
-    glUniformMatrix4fv(modelLoc, 1, GL_FALSE, glm::value_ptr(modelMatrix));
     
     glActiveTexture(GL_TEXTURE0);
     glBindTexture(GL_TEXTURE_2D, texture);
@@ -172,11 +198,32 @@ void Elevator::draw(unsigned int shader) {
     glEnable(GL_POLYGON_OFFSET_FILL);
     glPolygonOffset(-1.0f, -1.0f); // Negativan offset da lift bude bliže kameri (iznad)
     
-    // Renderuj sve 6 strana
+    // Renderuj sve strane OSIM prednjeg zida (index 2)
     for (int i = 0; i < 6; i++) {
-        glBindVertexArray(VAO[i]);
-        glDrawArrays(GL_TRIANGLE_FAN, 0, 4);
+        if (i != 2) { // Preskoči prednji zid (renderujemo vrata umesto njega)
+            glUniformMatrix4fv(modelLoc, 1, GL_FALSE, glm::value_ptr(modelMatrix));
+            glBindVertexArray(VAO[i]);
+            glDrawArrays(GL_TRIANGLE_FAN, 0, 4);
+        }
     }
+    
+    // Renderuj VRATA (dve polovine koje se razdvajaju)
+    // doorOpenAmount: 0=zatvoreno, 1=potpuno otvoreno
+    float doorOffset = doorOpenAmount * width * 0.5f; // Pomeraj za svaku polovinu (maksimalno width/2)
+    
+    // Leva polovina - pomera se levo
+    glm::mat4 leftDoorMatrix = modelMatrix;
+    leftDoorMatrix = glm::translate(leftDoorMatrix, glm::vec3(-doorOffset, 0.0f, 0.0f));
+    glUniformMatrix4fv(modelLoc, 1, GL_FALSE, glm::value_ptr(leftDoorMatrix));
+    glBindVertexArray(VAOdoorLeft);
+    glDrawArrays(GL_TRIANGLE_FAN, 0, 4);
+    
+    // Desna polovina - pomera se desno
+    glm::mat4 rightDoorMatrix = modelMatrix;
+    rightDoorMatrix = glm::translate(rightDoorMatrix, glm::vec3(doorOffset, 0.0f, 0.0f));
+    glUniformMatrix4fv(modelLoc, 1, GL_FALSE, glm::value_ptr(rightDoorMatrix));
+    glBindVertexArray(VAOdoorRight);
+    glDrawArrays(GL_TRIANGLE_FAN, 0, 4);
     
     glBindVertexArray(0);
     

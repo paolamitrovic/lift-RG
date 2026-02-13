@@ -249,6 +249,25 @@ int main(void)
     plantModel = glm::translate(plantModel, glm::vec3(-floorWidth/2.0f + 0.3f, 0.0f, -floorDepth/2.0f + 0.3f));
     plantModel = glm::scale(plantModel, glm::vec3(3.0f, 3.0f, 3.0f)); // Povećano skaliranje da se vidi
     
+    // Učitaj lampu za lift - na sredini plafona lifta, malo ispod
+    Model elevatorLamp("elevator lamp/AM152_063_Lugstar_Premium_LED.obj");
+    glm::mat4 lampModel = glm::mat4(1.0f);
+    // Pozicija lampe: sredina lifta po X i Z osi, malo ispod plafona lifta
+    float lampY = wallHeight - 0.15f; // Malo ispod plafona lifta (plafon je na wallHeight - 0.01)
+    lampModel = glm::translate(lampModel, glm::vec3(0.0f, lampY, elevatorZ)); // Sredina lifta
+    lampModel = glm::scale(lampModel, glm::vec3(0.03f, 0.03f, 0.03f)); // Smanjeno skaliranje
+    
+    // VRATA - animacija (iz 2D projekta)
+    float doorOpenAmount = 0.0f;         // Koliko su vrata otvorena (0=zatvoreno, 1=potpuno)
+    bool doorOpening = false;            // Da li se vrata otvaraju
+    bool doorClosing = false;            // Da li se vrata zatvaraju
+    bool doorOpen = false;               // Da li su vrata potpuno otvorena
+    double doorTimerStart = 0.0;         // Vreme kada su se vrata otvorila
+    bool doorExtended = false;           // Da li su vrata PRODUŽENO otvorena
+    
+    // OSOBA - da li je u liftu
+    bool personHasEnteredElevator = false;   // Da li je čovek ušao u lift
+    
     // Granice kretanja kamere (čoveka)
     float minX = -floorWidth/2.0f + 0.2f;  // Leva granica (malo unutar zida)
     float maxX = floorWidth/2.0f - 0.2f;   // Desna granica (malo unutar zida)
@@ -320,11 +339,151 @@ int main(void)
             newCameraPos += cameraSpeed * glm::normalize(glm::cross(cameraFront, cameraUp));
         }
         
+        // POZIV LIFTA (C) - iz 2D projekta
+        // Proveri da li je čovek blizu lifta (ispred lifta, blizu pozicije lifta po Z osi)
+        // Lift je na poziciji Z = elevator.z, širina = elevator.width, dubina = elevator.depth
+        float elevatorFrontZ = elevator.z - elevator.depth/2.0f;  // Prednja strana lifta (gleda ka -Z)
+        // Povećana granica za pozivanje lifta - omogućava pozivanje sa veće udaljenosti (do 1.5m ispred lifta)
+        bool nearElevatorFront = (cameraPos.z >= elevatorFrontZ - 1.5f && cameraPos.z <= elevatorFrontZ + 0.3f);
+        bool nearElevatorX = (cameraPos.x >= -elevator.width/2.0f - 0.5f && cameraPos.x <= elevator.width/2.0f + 0.5f);
+        bool nearElevator = nearElevatorFront && nearElevatorX;
+        
+        // Čovek poziva lift kada je BLIZU lifta (ispred lifta) i pritisne C
+        if (!personHasEnteredElevator &&
+            glfwGetKey(window, GLFW_KEY_C) == GLFW_PRESS &&
+            nearElevator) {
+            // Proveri da li je lift na istom spratu (za sada uvek true jer imamo samo jedan sprat)
+            bool elevatorAtPersonFloor = true; // Za sada uvek true
+            
+            if (elevatorAtPersonFloor) {
+                // SCENARIO 1: Lift je već na ovom spratu - samo otvori vrata
+                doorOpening = true;
+                doorClosing = false;
+                doorExtended = false;
+            }
+        }
+        
         // Ograniči kretanje unutar granica sprata
+        // Ako je čovek VAN lifta, ne može da uđe dok vrata nisu otvorena
+        // Ako je čovek U LIFTU, ne može da izađe dok vrata nisu otvorena
+        bool doorsFullyOpen = (doorOpenAmount >= 1.0f);
+        
+        // Granice za lift
+        float elevatorMinX = -elevator.width/2.0f;
+        float elevatorMaxX = elevator.width/2.0f;
+        float elevatorMinZ = elevator.z - elevator.depth/2.0f;
+        float elevatorMaxZ = elevator.z + elevator.depth/2.0f;
+        
+        // Proveri da li je čovek u liftu (sa malim marginom)
+        float margin = 0.05f; // Mala margina za detekciju
+        bool insideElevatorX = (newCameraPos.x >= elevatorMinX - margin && newCameraPos.x <= elevatorMaxX + margin);
+        bool insideElevatorZ = (newCameraPos.z >= elevatorMinZ - margin && newCameraPos.z <= elevatorMaxZ + margin);
+        bool insideElevator = insideElevatorX && insideElevatorZ;
+        
+        // Ako je čovek VAN lifta i pokušava da uđe, ali vrata nisu otvorena - blokiraj
+        // Ovo se dešava PRE nego što uđe u lift
+        if (!personHasEnteredElevator && !doorsFullyOpen) {
+            // Ne dozvoli da uđe u lift dok vrata nisu otvorena
+            // Blokiraj kretanje ako je blizu lifta (prednja strana)
+            // Povećana granica za blokiranje da se izbegne treperenje
+            float elevatorFrontZ = elevator.z - elevator.depth/2.0f;  // Prednja strana lifta
+            float blockingDistance = 0.5f; // Povećana granica za blokiranje (0.5m ispred lifta)
+            bool nearElevatorFront = (newCameraPos.z >= elevatorFrontZ - blockingDistance && newCameraPos.z <= elevatorFrontZ + 0.15f);
+            bool nearElevatorX = (newCameraPos.x >= elevatorMinX - 0.15f && newCameraPos.x <= elevatorMaxX + 0.15f);
+            
+            if (nearElevatorFront && nearElevatorX) {
+                // Blokiraj kretanje ka liftu (ne dozvoli da prođe kroz zatvorena vrata)
+                // Zadrži ga na sigurnoj udaljenosti ispred lifta
+                if (newCameraPos.z > elevatorFrontZ - 0.15f) {
+                    newCameraPos.z = elevatorFrontZ - 0.15f; // Zadrži ga ispred lifta (0.15m ispred)
+                }
+            }
+            
+            // Takođe, ako je već ušao u lift (unutar granica), vrati ga nazad
+            if (insideElevator) {
+                // Vrati ga nazad van lifta (ispred prednje strane)
+                newCameraPos.z = elevatorFrontZ - 0.2f; // Malo dalje da se izbegne treperenje
+                newCameraPos.x = glm::clamp(newCameraPos.x, elevatorMinX - 0.1f, elevatorMaxX + 0.1f);
+            }
+        }
+        
+        // Ako je čovek U LIFTU i pokušava da izađe, ali vrata nisu otvorena - blokiraj
+        // Povećaj granice blokiranja da se izbegne "treperenje" i vidljivost sprata
+        if (personHasEnteredElevator && !doorsFullyOpen) {
+            // Strože granice - veći margin da se izbegne izlazak iz opsega
+            float strictMargin = 0.3f; // Još veći margin za blokiranje (0.3m sa svake strane)
+            float strictMinX = elevatorMinX + strictMargin;
+            float strictMaxX = elevatorMaxX - strictMargin;
+            float strictMinZ = elevatorMinZ + strictMargin;
+            float strictMaxZ = elevatorMaxZ - strictMargin;
+            
+            // Ne dozvoli da izađe iz lifta dok vrata nisu otvorena
+            // Koristi strože granice da se izbegne vidljivost sprata kroz vrata
+            newCameraPos.x = glm::clamp(newCameraPos.x, strictMinX, strictMaxX);
+            newCameraPos.z = glm::clamp(newCameraPos.z, strictMinZ, strictMaxZ);
+        }
+        
+        // ULAZAK ČOVEKA U LIFT - iz 2D projekta
+        bool elevatorAtPersonFloor = true; // Za sada uvek true jer imamo samo jedan sprat
+        
+        // Čovek automatski ulazi u lift kada:
+        // 1. Nije već u liftu
+        // 2. Lift je na istom spratu
+        // 3. Vrata su potpuno otvorena
+        // 4. Čovek je unutar granica lifta (sa marginom)
+        if (!personHasEnteredElevator &&
+            elevatorAtPersonFloor &&
+            doorsFullyOpen &&
+            insideElevator) {
+            personHasEnteredElevator = true;
+            // Pomeri čoveka malo unutar lifta (centar lifta)
+            newCameraPos.x = glm::clamp(newCameraPos.x, elevatorMinX + 0.1f, elevatorMaxX - 0.1f);
+            newCameraPos.z = glm::clamp(newCameraPos.z, elevatorMinZ + 0.1f, elevatorMaxZ - 0.1f);
+        }
+        
+        // IZLAZAK ČOVEKA IZ LIFTA - iz 2D projekta
+        if (personHasEnteredElevator) {
+            // Može da izađe kada su vrata otvorena i kada se udalji od lifta
+            if (doorsFullyOpen && !insideElevator) {
+                personHasEnteredElevator = false;
+            }
+        }
+        
+        // Ograniči kretanje unutar granica sprata (ali poštuj ograničenja za lift)
         newCameraPos.x = glm::clamp(newCameraPos.x, minX, maxX);
         newCameraPos.z = glm::clamp(newCameraPos.z, minZ, maxZ);
         newCameraPos.y = cameraY; // Fiksna visina
         cameraPos = newCameraPos;
+        
+        // ANIMACIJA VRATA - iz 2D projekta
+        if (doorOpening) {
+            doorOpenAmount += 0.01f;
+            // Ako su vrata u potpunosti otvorena
+            if (doorOpenAmount >= 1.0f) {
+                doorOpenAmount = 1.0f;
+                doorOpening = false;
+                doorOpen = true;
+                doorTimerStart = glfwGetTime();  // POČNI merenje vremena za automatsko zatvaranje
+            }
+        }
+        
+        if (doorClosing) {
+            doorOpenAmount -= 0.01f;
+            // Ako su vrata u potpunosti zatvorena
+            if (doorOpenAmount <= 0.0f) {
+                doorOpenAmount = 0.0f;
+                doorClosing = false;
+                doorOpen = false;
+            }
+        }
+        
+        // AUTOMATSKO ZATVARANJE nakon 5 sekundi
+        if (doorOpen && !doorOpening && !doorClosing) {
+            double elapsed = glfwGetTime() - doorTimerStart;
+            if (elapsed >= 5.0) {
+                doorClosing = true;
+            }
+        }
 
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
         
@@ -347,16 +506,24 @@ int main(void)
         ceiling.draw(unifiedShader);
         
         // Renderuj lift POSLE plafona i zidova, ali sa negativnim depth offset-om da bude iznad
-        elevator.draw(unifiedShader);
+        elevator.draw(unifiedShader, doorOpenAmount);
         
-        // Renderuj biljku sa model shader-om (koristi normalu)
+        // Renderuj lampu za lift sa model shader-om (koristi normalu)
         glUseProgram(modelShader);
-        glUniformMatrix4fv(glGetUniformLocation(modelShader, "uM"), 1, GL_FALSE, glm::value_ptr(plantModel));
+        glUniformMatrix4fv(glGetUniformLocation(modelShader, "uM"), 1, GL_FALSE, glm::value_ptr(lampModel));
         glUniformMatrix4fv(glGetUniformLocation(modelShader, "uV"), 1, GL_FALSE, glm::value_ptr(view));
         glUniformMatrix4fv(glGetUniformLocation(modelShader, "uP"), 1, GL_FALSE, glm::value_ptr(projectionP));
         glUniform3f(glGetUniformLocation(modelShader, "uLightPos"), 0.0f, 2.0f, 0.0f);
         glUniform3fv(glGetUniformLocation(modelShader, "uViewPos"), 1, glm::value_ptr(cameraPos));
         glUniform3f(glGetUniformLocation(modelShader, "uLightColor"), 1.0f, 1.0f, 1.0f);
+        // Postavi boju za lampu (svetlo žuta/bele boje za lampu)
+        glUniform1i(glGetUniformLocation(modelShader, "uUseColor"), 1); // Koristi boju
+        glUniform3f(glGetUniformLocation(modelShader, "uModelColor"), 0.95f, 0.95f, 0.85f); // Svetlo žuta/bele boje
+        elevatorLamp.Draw(modelShader);
+        glUniform1i(glGetUniformLocation(modelShader, "uUseColor"), 0); // Vrati nazad za biljku
+        
+        // Renderuj biljku sa model shader-om (koristi normalu)
+        glUniformMatrix4fv(glGetUniformLocation(modelShader, "uM"), 1, GL_FALSE, glm::value_ptr(plantModel));
         plant.Draw(modelShader);
         glUseProgram(unifiedShader); // Vrati nazad na unified shader
 

@@ -10,6 +10,8 @@ uniform vec3 uViewPos;
 uniform vec3 uLightColor;
 
 uniform sampler2D uDiffMap1;
+uniform bool uUseColor;  // Da li da koristi boju umesto teksture
+uniform vec3 uModelColor; // Boja modela (ako se koristi umesto teksture)
 
 void main()
 {    
@@ -29,7 +31,19 @@ void main()
     float spec = pow(max(dot(viewDir, reflectDir), 0.0), 32);
     vec3 specular = specularStrength * spec * uLightColor;  
 
-    // Koristi teksturu direktno
-    vec4 texColor = texture(uDiffMap1, chUV);
-    FragColor = texColor * vec4(ambient + diffuse + specular, 1.0);
+    // Koristi boju ili teksturu
+    vec4 baseColor;
+    if (uUseColor) {
+        baseColor = vec4(uModelColor, 1.0);
+    } else {
+        vec4 texColor = texture(uDiffMap1, chUV);
+        // Ako je tekstura bela (nije učitana), koristi boju
+        if (texColor.r > 0.99 && texColor.g > 0.99 && texColor.b > 0.99) {
+            baseColor = vec4(uModelColor, 1.0);
+        } else {
+            baseColor = texColor;
+        }
+    }
+    
+    FragColor = baseColor * vec4(ambient + diffuse + specular, 1.0);
 }
