@@ -257,6 +257,13 @@ int main(void)
     lampModel = glm::translate(lampModel, glm::vec3(0.0f, lampY, elevatorZ)); // Sredina lifta
     lampModel = glm::scale(lampModel, glm::vec3(0.03f, 0.03f, 0.03f)); // Smanjeno skaliranje
     
+    // Učitaj lampu za plafon sprata - na sredini plafona sprata, malo ispod
+    Model floorLamp("elevator lamp/AM152_063_Lugstar_Premium_LED.obj");
+    glm::mat4 floorLampModel = glm::mat4(1.0f);
+    // Pozicija lampe: sredina sprata po X i Z osi, malo ispod plafona sprata
+    floorLampModel = glm::translate(floorLampModel, glm::vec3(0.0f, lampY, 0.0f)); // Sredina sprata
+    floorLampModel = glm::scale(floorLampModel, glm::vec3(0.03f, 0.03f, 0.03f)); // Isto skaliranje kao lampa u liftu
+    
     // VRATA - animacija (iz 2D projekta)
     float doorOpenAmount = 0.0f;         // Koliko su vrata otvorena (0=zatvoreno, 1=potpuno)
     bool doorOpening = false;            // Da li se vrata otvaraju
@@ -282,9 +289,63 @@ int main(void)
     unsigned int viewLoc = glGetUniformLocation(unifiedShader, "uV");
     unsigned int projectionLoc = glGetUniformLocation(unifiedShader, "uP");
     
+    // Uniforme za Phong osvetljenje - prvi izvor (lampa na spratu)
+    unsigned int viewPosLoc = glGetUniformLocation(unifiedShader, "uViewPos");
+    unsigned int lightPosLoc = glGetUniformLocation(unifiedShader, "uLight.pos");
+    unsigned int lightALoc = glGetUniformLocation(unifiedShader, "uLight.kA");
+    unsigned int lightDLoc = glGetUniformLocation(unifiedShader, "uLight.kD");
+    unsigned int lightSLoc = glGetUniformLocation(unifiedShader, "uLight.kS");
+    unsigned int lightConstantLoc = glGetUniformLocation(unifiedShader, "uLight.constant");
+    unsigned int lightLinearLoc = glGetUniformLocation(unifiedShader, "uLight.linear");
+    unsigned int lightQuadraticLoc = glGetUniformLocation(unifiedShader, "uLight.quadratic");
+    
+    // Uniforme za Phong osvetljenje - drugi izvor (lampa u liftu)
+    unsigned int light2PosLoc = glGetUniformLocation(unifiedShader, "uLight2.pos");
+    unsigned int light2ALoc = glGetUniformLocation(unifiedShader, "uLight2.kA");
+    unsigned int light2DLoc = glGetUniformLocation(unifiedShader, "uLight2.kD");
+    unsigned int light2SLoc = glGetUniformLocation(unifiedShader, "uLight2.kS");
+    unsigned int light2ConstantLoc = glGetUniformLocation(unifiedShader, "uLight2.constant");
+    unsigned int light2LinearLoc = glGetUniformLocation(unifiedShader, "uLight2.linear");
+    unsigned int light2QuadraticLoc = glGetUniformLocation(unifiedShader, "uLight2.quadratic");
+    
+    unsigned int materialShineLoc = glGetUniformLocation(unifiedShader, "uMaterial.shine");
+    unsigned int materialALoc = glGetUniformLocation(unifiedShader, "uMaterial.kA");
+    unsigned int materialDLoc = glGetUniformLocation(unifiedShader, "uMaterial.kD");
+    unsigned int materialSLoc = glGetUniformLocation(unifiedShader, "uMaterial.kS");
+    
+    // Pozicije lampi (izvori svetlosti)
+    glm::vec3 elevatorLightPos = glm::vec3(0.0f, lampY, elevatorZ); // Pozicija lampe u liftu
+    glm::vec3 floorLightPos = glm::vec3(0.0f, lampY, 0.0f); // Pozicija lampe na spratu
+    
     glm::mat4 view;
     glm::vec3 cameraUp = glm::vec3(0.0, 1.0, 0.0);
     glm::mat4 projectionP = glm::perspective(glm::radians(fov), (float)wWidth / (float)wHeight, 0.1f, 100.0f);
+    
+    // Postavi početne vrednosti za osvetljenje (koristićemo kombinaciju oba izvora)
+    glUseProgram(unifiedShader);
+    // Prvi izvor svetlosti (lampa na spratu)
+    glUniform3f(lightALoc, 0.3f, 0.3f, 0.3f); // Ambijentalna komponenta
+    glUniform3f(lightDLoc, 2.0f, 2.0f, 2.0f); // Difuzna komponenta (jača da se vidi krug)
+    glUniform3f(lightSLoc, 1.0f, 1.0f, 1.0f); // Spekularna komponenta
+    // Attenuation za prvi izvor (slabljenje sa udaljenošću) - stvara krug svetlosti
+    glUniform1f(lightConstantLoc, 1.0f);
+    glUniform1f(lightLinearLoc, 0.14f);
+    glUniform1f(lightQuadraticLoc, 0.07f);
+    
+    // Drugi izvor svetlosti (lampa u liftu) - jača svetlost u liftu
+    glUniform3f(light2ALoc, 0.3f, 0.3f, 0.3f); // Ambijentalna komponenta
+    glUniform3f(light2DLoc, 2.5f, 2.5f, 2.5f); // Difuzna komponenta (jača u liftu)
+    glUniform3f(light2SLoc, 1.0f, 1.0f, 1.0f); // Spekularna komponenta
+    // Attenuation za drugi izvor (slabljenje sa udaljenošću) - stvara krug svetlosti u liftu
+    glUniform1f(light2ConstantLoc, 1.0f);
+    glUniform1f(light2LinearLoc, 0.14f);
+    glUniform1f(light2QuadraticLoc, 0.07f);
+    
+    // Materijal za pod, zidove i lift (neutralan materijal)
+    glUniform1f(materialShineLoc, 32.0f); // Uglancanost
+    glUniform3f(materialALoc, 1.0f, 1.0f, 1.0f); // Ambijentalna refleksija materijala
+    glUniform3f(materialDLoc, 1.0f, 1.0f, 1.0f); // Difuzna refleksija materijala
+    glUniform3f(materialSLoc, 0.5f, 0.5f, 0.5f); // Spekularna refleksija materijala
 
     glClearColor(0.2, 0.2, 0.3, 1.0); // Tamnija pozadina
     
@@ -492,6 +553,11 @@ int main(void)
         glUniformMatrix4fv(viewLoc, 1, GL_FALSE, glm::value_ptr(view));
         glUniformMatrix4fv(projectionLoc, 1, GL_FALSE, glm::value_ptr(projectionP));
         
+        // Postavi pozicije svetlosti (izvori svetlosti u lampama)
+        glUniform3fv(viewPosLoc, 1, glm::value_ptr(cameraPos)); // Pozicija kamere
+        glUniform3fv(lightPosLoc, 1, glm::value_ptr(floorLightPos)); // Pozicija lampe na spratu
+        glUniform3fv(light2PosLoc, 1, glm::value_ptr(elevatorLightPos)); // Pozicija lampe u liftu
+        
         // Renderuj pod (sa teksturom)
         glUniform1i(glGetUniformLocation(unifiedShader, "useTex"), useTex);
         glUniform1i(glGetUniformLocation(unifiedShader, "transparent"), transparent);
@@ -520,6 +586,11 @@ int main(void)
         glUniform1i(glGetUniformLocation(modelShader, "uUseColor"), 1); // Koristi boju
         glUniform3f(glGetUniformLocation(modelShader, "uModelColor"), 0.95f, 0.95f, 0.85f); // Svetlo žuta/bele boje
         elevatorLamp.Draw(modelShader);
+        
+        // Renderuj lampu za plafon sprata sa model shader-om (koristi normalu)
+        glUniformMatrix4fv(glGetUniformLocation(modelShader, "uM"), 1, GL_FALSE, glm::value_ptr(floorLampModel));
+        floorLamp.Draw(modelShader);
+        
         glUniform1i(glGetUniformLocation(modelShader, "uUseColor"), 0); // Vrati nazad za biljku
         
         // Renderuj biljku sa model shader-om (koristi normalu)
