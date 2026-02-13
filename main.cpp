@@ -16,6 +16,7 @@
 #include "Util.h"
 #include "Floor.h"
 #include "Wall.h"
+#include "model.hpp"
 
 bool useTex = true; // Uključimo teksture po defaultu
 bool transparent = false;
@@ -23,6 +24,7 @@ bool transparent = false;
 // Name texture overlay
 unsigned int nameTexture;
 unsigned int rectShader;
+unsigned int modelShader;
 unsigned int VAOrect;
 unsigned int VBOrect;
 
@@ -156,6 +158,9 @@ int main(void)
     // Load name texture for overlay
     nameTexture = preprocessTexture("res/name.png");
     
+    // Load shader for 3D models (with normals)
+    modelShader = createShader("model.vert", "model.frag");
+    
     // Create shader for 2D overlay
     rectShader = createShader("rect.vert", "rect.frag");
     glUseProgram(rectShader);
@@ -223,6 +228,14 @@ int main(void)
     Floor ceiling;
     ceiling.setup(floorWidth, floorDepth, wallHeight);
     ceiling.texture = wallTexture;
+    
+    
+    // Učitaj biljku - u jednom uglu sprata
+    Model plant("plant 1/uploads_files_4769167_Flower.obj");
+    glm::mat4 plantModel = glm::mat4(1.0f);
+    // Pozicija biljke: u uglu (levo, napred) - malo unutar zidova
+    plantModel = glm::translate(plantModel, glm::vec3(-floorWidth/2.0f + 0.3f, 0.0f, -floorDepth/2.0f + 0.3f));
+    plantModel = glm::scale(plantModel, glm::vec3(3.0f, 3.0f, 3.0f)); // Povećano skaliranje da se vidi
     
     // Granice kretanja kamere (čoveka)
     float minX = -floorWidth/2.0f + 0.2f;  // Leva granica (malo unutar zida)
@@ -320,6 +333,17 @@ int main(void)
         
         // Renderuj plafon
         ceiling.draw(unifiedShader);
+        
+        // Renderuj biljku sa model shader-om (koristi normalu)
+        glUseProgram(modelShader);
+        glUniformMatrix4fv(glGetUniformLocation(modelShader, "uM"), 1, GL_FALSE, glm::value_ptr(plantModel));
+        glUniformMatrix4fv(glGetUniformLocation(modelShader, "uV"), 1, GL_FALSE, glm::value_ptr(view));
+        glUniformMatrix4fv(glGetUniformLocation(modelShader, "uP"), 1, GL_FALSE, glm::value_ptr(projectionP));
+        glUniform3f(glGetUniformLocation(modelShader, "uLightPos"), 0.0f, 2.0f, 0.0f);
+        glUniform3fv(glGetUniformLocation(modelShader, "uViewPos"), 1, glm::value_ptr(cameraPos));
+        glUniform3f(glGetUniformLocation(modelShader, "uLightColor"), 1.0f, 1.0f, 1.0f);
+        plant.Draw(modelShader);
+        glUseProgram(unifiedShader); // Vrati nazad na unified shader
 
         // Render name texture overlay (always on top)
         glDisable(GL_DEPTH_TEST); // Disable depth testing for overlay
@@ -349,6 +373,7 @@ int main(void)
     glDeleteTextures(1, &wallTexture);
 
     glDeleteProgram(unifiedShader);
+    glDeleteProgram(modelShader);
 
     glfwTerminate();
     return 0;
