@@ -1,0 +1,39 @@
+# Visual Studio temporary files
+.vs/
+*.user
+*.suo
+*.VC.db
+*.VC.VC.opendb
+
+# Build folders
+bin/
+obj/
+x64/
+Debug/
+Release/
+
+# Visual Studio Solution files that are user-specific
+*.vscode/
+
+# OS generated files
+Thumbs.db
+.DS_Store
+
+# Blender files (ako ne želiš da šalješ .blend fajlove)
+*.blend
+
+# Compiled object files
+*.o
+*.obj
+*.exe
+*.dll
+
+# Logs and databases
+*.log
+*.sqlite
+*.sqlite3
+
+# Other temporary files
+*.tmp
+*.temp
+*.cache

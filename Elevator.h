@@ -1,0 +1,16 @@
+#pragma once
+#include <GL/glew.h>
+#include <glm/glm.hpp>
+#include <glm/gtc/matrix_transform.hpp>
+
+struct Elevator {
+    unsigned int VAO, VBO;
+    unsigned int texture;
+    glm::mat4 modelMatrix;
+    float x, y, z;
+    float width, depth, height;
+    
+    Elevator();
+    void setup(float w, float d, float h, float posX, float posY, float posZ);
+    void draw(unsigned int shader);
+};
