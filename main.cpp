@@ -242,11 +242,11 @@ int main(void)
     elevator.setup(elevatorWidth, elevatorDepth, wallHeight, 0.0f, 0.0f, elevatorZ);
     elevator.texture = elevatorTexture;
     
-    // Učitaj biljku - u jednom uglu sprata
+    // Učitaj biljku - uz prednji zid (najdalji od lifta, u koji prvo pogleda čovek), na sredini po X osi
     Model plant("plant 1/uploads_files_4769167_Flower.obj");
     glm::mat4 plantModel = glm::mat4(1.0f);
-    // Pozicija biljke: u uglu (levo, napred) - malo unutar zidova
-    plantModel = glm::translate(plantModel, glm::vec3(-floorWidth/2.0f + 0.3f, 0.0f, -floorDepth/2.0f + 0.3f));
+    // Pozicija biljke: sredina po X osi (0.0), uz prednji zid (-floorDepth/2.0f + malo unutar)
+    plantModel = glm::translate(plantModel, glm::vec3(0.0f, 0.0f, -floorDepth/2.0f + 0.3f));
     plantModel = glm::scale(plantModel, glm::vec3(3.0f, 3.0f, 3.0f)); // Povećano skaliranje da se vidi
     
     // Učitaj lampu za lift - na sredini plafona lifta, malo ispod
@@ -421,6 +421,27 @@ int main(void)
                 doorOpening = true;
                 doorClosing = false;
                 doorExtended = false;
+            }
+        }
+        
+        // OTVARANJE VRATA IZ LIFTA (O) - iz 2D projekta
+        // Čovek može da otvori vrata kada je U LIFTU i pritisne O
+        if (personHasEnteredElevator && glfwGetKey(window, GLFW_KEY_O) == GLFW_PRESS) {
+            // SCENARIO 1: Vrata su POTPUNO OTVORENA i mirna
+            if (doorOpen && !doorOpening && !doorClosing) {
+                // VAŽNO: Proveri da li JOŠ NIJE produženo
+                if (!doorExtended) {
+                    // Produži otvaranje za još 5 sekundi (SAMO JEDNOM)
+                    doorTimerStart = glfwGetTime();  // RESETUJ timer
+                    doorExtended = true;             // OZNAČI da je VEĆ produženo
+                }
+            }
+            // SCENARIO 2: Vrata nisu u procesu (zatvorena su)
+            else if (!doorOpening && !doorClosing) {
+                // Pokreni otvaranje vrata
+                doorOpening = true;
+                doorClosing = false;
+                doorExtended = false;  // Resetuj - nije još produženo
             }
         }
         
