@@ -275,6 +275,12 @@ int main(void)
     // OSOBA - da li je u liftu
     bool personHasEnteredElevator = false;   // Da li je čovek ušao u lift
     
+    // Podešavanja za testiranje dubine i odstranjivanje naličja (toggle stanja)
+    bool depthTestWasPressed = false;   // Da li je taster 1 bio pritisnut u prethodnom frame-u
+    bool depthTestDisableWasPressed = false; // Da li je taster 2 bio pritisnut u prethodnom frame-u
+    bool cullFaceWasPressed = false;    // Da li je taster 3 bio pritisnut u prethodnom frame-u
+    bool cullFaceDisableWasPressed = false; // Da li je taster 4 bio pritisnut u prethodnom frame-u
+    
     // Granice kretanja kamere (čoveka)
     float minX = -floorWidth/2.0f + 0.2f;  // Leva granica (malo unutar zida)
     float maxX = floorWidth/2.0f - 0.2f;   // Desna granica (malo unutar zida)
@@ -360,25 +366,37 @@ int main(void)
             glfwSetWindowShouldClose(window, GL_TRUE);
         }
 
-        //Testiranje dubine
-        if (glfwGetKey(window, GLFW_KEY_1) == GLFW_PRESS)
+        //Testiranje dubine - toggle sa tasterom 1 (uključivanje)
+        bool depthTestPressed = (glfwGetKey(window, GLFW_KEY_1) == GLFW_PRESS);
+        if (depthTestPressed && !depthTestWasPressed)
         {
             glEnable(GL_DEPTH_TEST); //Ukljucivanje testiranja Z bafera
         }
-        if (glfwGetKey(window, GLFW_KEY_2) == GLFW_PRESS)
+        depthTestWasPressed = depthTestPressed;
+        
+        //Testiranje dubine - toggle sa tasterom 2 (isključivanje)
+        bool depthTestDisablePressed = (glfwGetKey(window, GLFW_KEY_2) == GLFW_PRESS);
+        if (depthTestDisablePressed && !depthTestDisableWasPressed)
         {
             glDisable(GL_DEPTH_TEST);
         }
+        depthTestDisableWasPressed = depthTestDisablePressed;
 
-        //Odstranjivanje lica (Prethodno smo podesili koje lice uklanjamo sa glCullFace)
-        if (glfwGetKey(window, GLFW_KEY_3) == GLFW_PRESS)
+        //Odstranjivanje lica - toggle sa tasterom 3 (uključivanje)
+        bool cullFacePressed = (glfwGetKey(window, GLFW_KEY_3) == GLFW_PRESS);
+        if (cullFacePressed && !cullFaceWasPressed)
         {
             glEnable(GL_CULL_FACE);
         }
-        if (glfwGetKey(window, GLFW_KEY_4) == GLFW_PRESS)
+        cullFaceWasPressed = cullFacePressed;
+        
+        //Odstranjivanje lica - toggle sa tasterom 4 (isključivanje)
+        bool cullFaceDisablePressed = (glfwGetKey(window, GLFW_KEY_4) == GLFW_PRESS);
+        if (cullFaceDisablePressed && !cullFaceDisableWasPressed)
         {
             glDisable(GL_CULL_FACE);
         }
+        cullFaceDisableWasPressed = cullFaceDisablePressed;
 
         // WASD kretanje kamere (čoveka) sa ograničenjima
         glm::vec3 newCameraPos = cameraPos;
